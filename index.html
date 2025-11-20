@@ -3,121 +3,639 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inisialisasi Firebase yang Diperbaiki</title>
+    <title>Game Memori Sinonim - Siap Deploy</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f4f7f9;
+        body { font-family: 'Inter', sans-serif; }
+        .card {
+            background-color: #f3f4f6;
+            transition: transform 0.3s, background-color 0.3s;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            border-radius: 0.75rem;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+            position: relative;
+            height: 100%;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.is-flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+        }
+        .card-back {
+            background-color: #1e3a8a; /* Blue 800 */
+            color: white;
+            font-size: 1.5rem;
+            line-height: 1.75rem;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-front {
+            background-color: #ffffff;
+            color: #1f2937;
+            transform: rotateY(180deg);
+            border: 3px solid #1e3a8a;
+            font-size: 1.2rem;
+        }
+        .card.matched {
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .action-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-button:hover {
+            opacity: 0.9;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .admin-warning {
+            border: 2px solid #fbbf24;
+            background-color: #fffbeb;
+            color: #b45309;
         }
     </style>
 </head>
-<body class="p-6">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-lg">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Status Aplikasi Firebase</h1>
-        <p class="text-gray-600 mb-6">
-            Aplikasi ini akan mencoba menginisialisasi Firebase dan melakukan autentikasi menggunakan kredensial lingkungan yang disediakan.
-        </p>
+    <div id="app" class="w-full max-w-4xl bg-white p-8 rounded-xl shadow-2xl space-y-6">
+
+        <!-- Status & User ID Display -->
+        <div class="text-xs text-gray-500 flex justify-between items-center pb-4 border-b border-gray-200">
+            <span id="status-message" class="text-sm font-medium text-blue-600">Menghubungkan ke database...</span>
+            <span class="text-xs">
+                User ID: 
+                <span id="display-user-id" class="font-mono text-gray-700 text-ellipsis overflow-hidden max-w-[150px] inline-block">N/A</span>
+            </span>
+        </div>
         
-        <div id="status-card" class="p-4 rounded-lg transition duration-300 ease-in-out">
-            <p class="font-semibold" id="status">Memuat...</p>
+        <!-- ERROR CONFIG SCREEN (Hidden by default) -->
+        <div id="config-error-screen" class="hidden p-6 bg-red-50 border-2 border-red-500 rounded-xl text-center space-y-4">
+            <h2 class="text-2xl font-bold text-red-700">⚠️ Konfigurasi Belum Lengkap</h2>
+            <p class="text-gray-700">
+                Game ini dijalankan di hosting publik (GitHub/Vercel) tetapi Kunci API Firebase belum diisi.
+            </p>
+            <div class="bg-white p-4 rounded text-left text-sm font-mono overflow-x-auto border border-gray-300">
+                1. Buka file index.html ini di editor.<br>
+                2. Cari variabel constant bernama <strong>MANUAL_CONFIG</strong>.<br>
+                3. Ganti "ISI_API_KEY_DISINI" dengan kunci asli dari Firebase Console Anda.
+            </div>
+            <button onclick="location.reload()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                Saya Sudah Menggantinya, Refresh Halaman
+            </button>
         </div>
 
-        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 border border-gray-200">
-            <p><strong>Catatan:</strong> Pesan kesalahan "Kunci API masih placeholder" muncul ketika kode secara manual mendefinisikan konfigurasi Firebase dengan nilai dummy. Kode di bawah ini menggunakan variabel global `__firebase_config` dan `__initial_auth_token` untuk mengatasi masalah ini.</p>
+        <!-- LAYAR A: HOME SCREEN -->
+        <div id="home-screen" class="screen space-y-10 text-center">
+            <h1 class="text-5xl font-extrabold text-gray-800 tracking-tight">MEMORI SINONIM <span class="text-blue-600">ID</span></h1>
+            <p class="text-xl text-gray-600">Uji pengetahuan kosakata Anda dalam Bahasa Indonesia. Cocokkan pasangan kata yang bersinonim secepat mungkin!</p>
+            <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <button onclick="showScreen('input-screen')" class="action-button bg-blue-600 text-white hover:bg-blue-700">
+                    <i data-lucide="play" class="w-5 h-5 mr-2"></i> Mulai Bermain
+                </button>
+                <button onclick="showScreen('admin-screen')" class="action-button bg-gray-500 text-white hover:bg-gray-600">
+                    <i data-lucide="shield-check" class="w-5 h-5 mr-2"></i> Menu Admin/Skor
+                </button>
+            </div>
+        </div>
+
+        <!-- LAYAR B: INPUT PLAYER NAME -->
+        <div id="input-screen" class="screen hidden space-y-6 max-w-md mx-auto">
+            <h2 class="text-3xl font-bold text-gray-800 text-center">Siap Bermain!</h2>
+            <input type="text" id="player-name-input" placeholder="Nama Lengkap (Contoh: Budi Santoso)"
+                   class="w-full p-4 border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 text-lg"
+                   maxlength="50">
+            <button onclick="startGame()" class="action-button w-full bg-green-600 text-white hover:bg-green-700 text-lg">
+                <i data-lucide="log-in" class="w-6 h-6 mr-2"></i> Lanjut ke Game
+            </button>
+            <button onclick="showScreen('home-screen')" class="action-button w-full bg-gray-300 text-gray-800 hover:bg-gray-400">
+                Kembali
+            </button>
+        </div>
+
+        <!-- LAYAR C: GAME SCREEN -->
+        <div id="game-screen" class="screen hidden space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-blue-50 rounded-xl shadow-md">
+                <div class="text-base font-semibold text-gray-700">Pemain: <span id="current-player-name" class="text-blue-600 font-bold"></span></div>
+                <div class="text-lg font-bold text-red-600 mt-2 sm:mt-0">
+                    <i data-lucide="clock" class="w-5 h-5 inline mr-1"></i> Waktu: <span id="game-timer" class="text-2xl">00:00</span>
+                </div>
+            </div>
+            <div id="game-grid" class="grid grid-cols-4 md:grid-cols-4 gap-3 md:gap-4" style="aspect-ratio: 4/5;">
+                <!-- Kartu akan diinjeksi di sini -->
+            </div>
+            <div class="text-center text-lg font-semibold text-gray-700 p-2 bg-gray-100 rounded-lg">
+                <i data-lucide="check-circle" class="w-5 h-5 inline text-green-600 mr-1"></i> Pasangan Benar: <span id="correct-count" class="text-green-600">0</span> |
+                <i data-lucide="x-circle" class="w-5 h-5 inline text-red-600 mr-1"></i> Coba Salah: <span id="mismatch-count" class="text-red-600">0</span>
+            </div>
+        </div>
+
+        <!-- LAYAR D: RESULT SCREEN -->
+        <div id="result-screen" class="screen hidden space-y-8 text-center">
+            <h2 class="text-5xl font-extrabold text-green-700">🎉 Selesai! Skor Anda Tersimpan 🎉</h2>
+            <div id="final-stats" class="text-xl space-y-3 bg-green-50 p-8 rounded-2xl shadow-lg max-w-md mx-auto admin-warning">
+                <p>Nama: <span id="result-name" class="font-bold"></span></p>
+                <p>Waktu Total: <span id="result-time" class="font-bold text-red-600"></span></p>
+                <p>Pasangan Benar: <span id="result-correct" class="font-bold text-green-600"></span></p>
+                <p>Percobaan Salah: <span id="result-mismatch" class="font-bold text-yellow-600"></span></p>
+                <p class="text-3xl pt-4 border-t border-gray-300">Skor Total: <span id="result-score" class="font-extrabold text-blue-700"></span></p>
+            </div>
+            <button onclick="showScreen('home-screen')" class="action-button bg-blue-600 text-white hover:bg-blue-700 text-lg">
+                <i data-lucide="home" class="w-6 h-6 mr-2"></i> Kembali ke Menu Utama
+            </button>
+        </div>
+
+        <!-- LAYAR E: ADMIN/SCORE SCREEN -->
+        <div id="admin-screen" class="screen hidden space-y-6">
+            <h2 class="text-3xl font-bold text-gray-800 text-center">Menu Admin & Papan Skor</h2>
+
+            <!-- Password gate for Admin Screen -->
+            <div id="admin-password-gate" class="space-y-4 max-w-sm mx-auto p-6 admin-warning rounded-xl">
+                <h3 class="text-xl font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="lock" class="w-6 h-6 mr-2"></i> Akses Admin Terproteksi
+                </h3>
+                <p class="text-sm text-gray-700">Masukkan kata sandi khusus untuk melihat fitur admin.</p>
+                <input type="password" id="admin-password-input" placeholder="Kata Sandi"
+                       class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base">
+                <p id="password-feedback" class="text-red-600 font-medium text-sm hidden">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 inline mr-1"></i> Kata sandi salah. Coba lagi.
+                </p>
+                <button onclick="checkAdminPassword()" class="action-button w-full bg-yellow-600 text-white hover:bg-yellow-700">
+                    Masuk
+                </button>
+            </div>
+
+            <!-- Admin Content (initially hidden) -->
+            <div id="admin-content" class="hidden space-y-6">
+                <!-- Leaderboard -->
+                <div class="bg-gray-100 p-4 rounded-xl shadow-inner">
+                    <h3 class="text-xl font-semibold mb-3 flex items-center text-blue-800">
+                        <i data-lucide="list-ordered" class="w-5 h-5 mr-2"></i> Papan Skor (Top 10 Real-time)
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead>
+                                <tr class="text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-200">
+                                    <th class="py-3 px-2">#</th>
+                                    <th class="py-3 px-3">Nama Pemain</th>
+                                    <th class="py-3 px-3">Skor</th>
+                                    <th class="py-3 px-3">Waktu</th>
+                                    <th class="py-3 px-2">Benar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body" class="bg-white divide-y divide-gray-200 text-sm">
+                                <tr><td colspan="5" class="text-center py-4">Memuat data skor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Export Button -->
+                <div class="space-y-4 pt-4 border-t border-gray-200">
+                    <h3 class="text-xl font-semibold flex items-center text-gray-800">
+                        <i data-lucide="download" class="w-5 h-5 mr-2"></i> Ekspor Data (CSV)
+                    </h3>
+                    <p class="text-sm text-gray-600">Ambil data dari database untuk diimpor ke Excel/Google Sheets.</p>
+                    <button onclick="exportScoresToCSV()" class="action-button w-full bg-purple-600 text-white hover:bg-purple-700">
+                        <i data-lucide="file-text" class="w-5 h-5 mr-2"></i> Unduh Data Skor (.csv)
+                    </button>
+                </div>
+
+                <!-- Database Reset Section -->
+                <div class="space-y-4 pt-6 border-t border-gray-200 p-4 bg-red-50 rounded-xl">
+                    <h3 class="text-xl font-semibold text-red-700 flex items-center">
+                        <i data-lucide="hard-hat" class="w-5 h-5 mr-2"></i> Manajemen Database
+                    </h3>
+                    <p class="text-sm text-red-600 font-medium">PERINGATAN! Tindakan ini akan menghapus SEMUA data skor dari database secara permanen.</p>
+                    <button onclick="confirmResetDatabase()" class="action-button w-full bg-red-600 text-white hover:bg-red-700">
+                        <i data-lucide="trash-2" class="w-5 h-5 mr-2"></i> Reset Database (Hapus Semua Skor)
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="showScreen('home-screen')" class="action-button w-full bg-gray-300 text-gray-800 hover:bg-gray-400 mt-4">
+                Kembali
+            </button>
         </div>
     </div>
+    
+    <!-- Lucide Icons Rendering -->
+    <script>
+        if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+    </script>
 
-    <!-- Modul Firebase -->
+    <!-- SCRIPT UTAMA -->
     <script type="module">
-        // Import fungsi Firebase yang diperlukan
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, orderBy, setLogLevel, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Atur level log ke Debug untuk melihat detail di konsol
-        setLogLevel('debug'); 
-
-        const statusElement = document.getElementById('status');
-        const statusCard = document.getElementById('status-card');
-
-        // Deklarasi global (atau let) agar bisa diakses di seluruh module
-        let app;
-        let auth;
-        let db;
+        // ====================================================================
+        // --- KONFIGURASI FIREBASE DUAL MODE ---
+        // ====================================================================
         
-        // --- Wrapper Fungsi Utama untuk Memperbaiki "Illegal return statement" ---
-        const main = async () => {
+        // 1. MODE HOSTING MANUAL (Untuk GitHub/Vercel/Hosting Sendiri)
+        //    WAJIB DIISI jika Anda mengupload file ini ke internet.
+        const MANUAL_CONFIG = {
+            apiKey: "ISI_API_KEY_DISINI", // Contoh: "AIzaSy..."
+            authDomain: "ISI_AUTH_DOMAIN_DISINI",
+            projectId: "ISI_PROJECT_ID_DISINI",
+            storageBucket: "ISI_STORAGE_BUCKET_DISINI",
+            messagingSenderId: "ISI_MESSAGING_SENDER_ID_DISINI",
+            appId: "ISI_APP_ID_DISINI"
+        };
 
-            // --- Langkah 1: Mendapatkan Konfigurasi ---
-            let firebaseConfig;
-            try {
-                // Mengambil konfigurasi dari variabel global __firebase_config
-                firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            } catch (e) {
-                console.error("Gagal memparsing konfigurasi Firebase:", e);
-                statusElement.textContent = "KESALAHAN KONFIGURASI: Gagal memproses variabel `__firebase_config`.";
-                statusCard.classList.add('bg-red-100', 'text-red-700');
-                return; // Return ini sekarang legal karena berada di dalam fungsi main()
+        // 2. MODE SANDBOX (Otomatis untuk environment ini)
+        const ENV_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const INITIAL_TOKEN = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Logika Pemilihan Konfigurasi ---
+        let firebaseConfig;
+        let useManual = false;
+
+        if (ENV_CONFIG) {
+            // Jika berjalan di sandbox AI, pakai config otomatis
+            firebaseConfig = ENV_CONFIG;
+            console.log("Menggunakan Konfigurasi Otomatis (Sandbox)");
+        } else {
+            // Jika berjalan di GitHub/Vercel, pakai config manual
+            firebaseConfig = MANUAL_CONFIG;
+            useManual = true;
+            console.log("Menggunakan Konfigurasi Manual (Hosting)");
+        }
+
+        // Path koleksi data
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'game-sinonim-default';
+        // Jika di sandbox, pakai path panjang. Jika manual, path pendek.
+        const COLLECTION_PATH = useManual ? 'game_results' : `/artifacts/${APP_ID}/public/data/game_results`;
+
+
+        // Global Variables
+        window.app = null;
+        window.db = null;
+        window.auth = null;
+        window.userId = null;
+        window.isAuthReady = false;
+
+        // Fungsi inisialisasi utama
+        async function initFirebase() {
+            // Cek apakah config valid
+            if (useManual && (firebaseConfig.apiKey === "ISI_API_KEY_DISINI" || !firebaseConfig.apiKey)) {
+                // Tampilkan layar error jika di hosting tapi belum diisi key-nya
+                document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+                document.getElementById('config-error-screen').classList.remove('hidden');
+                document.getElementById('status-message').textContent = 'Error Konfigurasi.';
+                return;
             }
 
-            // Memeriksa apakah konfigurasi valid
-            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_API_KEY')) {
-                console.error("Konfigurasi Firebase tidak valid atau masih berupa placeholder.");
-                statusElement.textContent = "KESALAHAN KONFIGURASI: Kredensial Firebase tidak valid atau hilang. Silakan periksa pengaturan lingkungan Anda.";
-                statusCard.classList.add('bg-red-100', 'text-red-700');
-                return; // Return ini sekarang legal karena berada di dalam fungsi main()
-            }
-
-            // --- Langkah 2: Inisialisasi Firebase ---
             try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                console.log("Firebase berhasil diinisialisasi.");
-                statusElement.textContent = "Firebase berhasil diinisialisasi. Mencoba Autentikasi...";
-                statusCard.classList.remove('bg-red-100', 'text-red-700');
-                statusCard.classList.add('bg-yellow-100', 'text-yellow-700');
-            } catch (error) {
-                console.error("Gagal inisialisasi Firebase:", error);
-                statusElement.textContent = `KESALAHAN INISIALISASI: ${error.message}`;
-                statusCard.classList.remove('bg-yellow-100', 'text-yellow-700');
-                statusCard.classList.add('bg-red-100', 'text-red-700');
-                return; // Return ini sekarang legal karena berada di dalam fungsi main()
-            }
+                setLogLevel('debug');
+                window.app = initializeApp(firebaseConfig);
+                window.db = getFirestore(window.app);
+                window.auth = getAuth(window.app);
 
-            // --- Langkah 3: Autentikasi Pengguna ---
-            try {
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-                if (initialAuthToken) {
-                    // Menggunakan token kustom yang disediakan lingkungan
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Autentikasi berhasil menggunakan token kustom.");
-                    statusElement.textContent = `Autentikasi Berhasil! Pengguna ID: ${auth.currentUser.uid}`;
+                // Autentikasi
+                if (INITIAL_TOKEN && !useManual) {
+                    await signInWithCustomToken(window.auth, INITIAL_TOKEN);
                 } else {
-                    // Masuk secara anonim jika tidak ada token kustom
-                    await signInAnonymously(auth);
-                    console.log("Autentikasi berhasil secara anonim.");
-                    statusElement.textContent = `Autentikasi Berhasil (Anonim)! Pengguna ID: ${auth.currentUser.uid}`;
+                    await signInAnonymously(window.auth);
                 }
 
-                statusCard.classList.remove('bg-yellow-100', 'text-yellow-700');
-                statusCard.classList.add('bg-green-100', 'text-green-700');
-
+                onAuthStateChanged(window.auth, (user) => {
+                    if (user) {
+                        window.userId = user.uid;
+                        window.isAuthReady = true;
+                        console.log("Firebase Auth Ready. User ID:", window.userId);
+                        document.getElementById('display-user-id').textContent = window.userId;
+                        window.setupScoreListener();
+                    } else {
+                        window.isAuthReady = true;
+                        document.getElementById('display-user-id').textContent = 'Anonim';
+                    }
+                });
             } catch (error) {
-                console.error("Gagal autentikasi Firebase:", error);
-                statusElement.textContent = `KESALAHAN AUTENTIKASI: ${error.message}`;
-                statusCard.classList.remove('bg-yellow-100', 'text-yellow-700');
-                statusCard.classList.add('bg-red-100', 'text-red-700');
+                console.error("Firebase Init Error:", error);
+                document.getElementById('status-message').textContent = 'Gagal koneksi DB: ' + error.message;
+            }
+        }
+
+        // ... (Sisa kode logika game sama seperti sebelumnya) ...
+        // Fungsi simpan skor
+        window.saveScore = async (scoreData) => {
+            if (!window.isAuthReady || !window.db) {
+                console.error("DB not ready");
+                return;
+            }
+            try {
+                scoreData.userId = window.userId || 'anonim'; 
+                await addDoc(collection(window.db, COLLECTION_PATH), scoreData);
+                console.log("Skor tersimpan");
+            } catch (error) {
+                console.error("Error save:", error);
+                alert("Gagal menyimpan skor: " + error.message);
             }
         };
 
-        // Mulai proses utama
-        main();
+        // Fungsi ambil semua skor
+        window.fetchAllScores = async () => {
+            if (!window.isAuthReady || !window.db) return [];
+            try {
+                const snapshot = await getDocs(collection(window.db, COLLECTION_PATH));
+                const scores = [];
+                snapshot.forEach(doc => scores.push(doc.data()));
+                return scores;
+            } catch (e) {
+                console.error("Fetch error:", e);
+                return [];
+            }
+        };
 
+        // Fungsi listener realtime
+        window.setupScoreListener = () => {
+            if (!window.isAuthReady || !window.db) return;
+            try {
+                const q = query(collection(window.db, COLLECTION_PATH));
+                onSnapshot(q, (snapshot) => {
+                    const scores = [];
+                    snapshot.forEach(doc => scores.push(doc.data()));
+                    scores.sort((a, b) => b.skor_total - a.skor_total || a.waktu_bermain - b.waktu_bermain);
+                    window.updateLeaderboard(scores);
+                });
+            } catch (e) {
+                console.error("Listener error:", e);
+            }
+        };
+
+        // Fungsi Reset DB
+        window.resetDatabase = async () => {
+            const btn = document.querySelector('#admin-content button.bg-red-600');
+            btn.disabled = true;
+            btn.textContent = "Menghapus...";
+            try {
+                const snapshot = await getDocs(collection(window.db, COLLECTION_PATH));
+                const promises = [];
+                snapshot.forEach(docItem => {
+                    promises.push(deleteDoc(doc(window.db, COLLECTION_PATH, docItem.id)));
+                });
+                await Promise.all(promises);
+                alert("Database berhasil di-reset!");
+                btn.textContent = "Reset Selesai";
+            } catch (e) {
+                alert("Gagal reset: " + e.message);
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = "Reset Database (Hapus Semua Skor)";
+                    btn.onclick = window.confirmResetDatabase;
+                }, 2000);
+            }
+        };
+
+        // Jalankan
+        window.addEventListener('load', initFirebase);
+    </script>
+
+    <!-- SCRIPT LOGIKA GAME UI -->
+    <script>
+        // --- DATA KOSAKATA & LOGIKA GAME (SAMA SEPERTI SEBELUMNYA) ---
+        const SYNONYM_PAIRS = [
+            { id: 1, word: "Cepat", synonym: "Lekas" },
+            { id: 2, word: "Agak", synonym: "Lumayan" },
+            { id: 3, word: "Sering", synonym: "Kerap" },
+            { id: 4, word: "Wajah", synonym: "Muka" },
+            { id: 5, word: "Senang", synonym: "Bahagia" },
+            { id: 6, word: "Boikot", synonym: "Penolakan" },
+            { id: 7, word: "Hadir", synonym: "Ada" },
+            { id: 8, word: "Sama", synonym: "Serupa" },
+        ];
+
+        let playerName = '', cards = [], hasFlippedCard = false, lockBoard = false;
+        let firstCard = null, secondCard = null, matchesFound = 0, mismatchCount = 0;
+        let timerInterval, seconds = 0;
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function formatTime(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+            if (screenId === 'input-screen') document.getElementById('player-name-input').focus();
+            if (screenId === 'admin-screen') {
+                document.getElementById('admin-password-gate').classList.remove('hidden');
+                document.getElementById('admin-content').classList.add('hidden');
+                document.getElementById('password-feedback').classList.add('hidden');
+                document.getElementById('admin-password-input').value = '';
+            }
+        }
+
+        window.updateLeaderboard = (scores) => {
+            const tbody = document.getElementById('leaderboard-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (scores.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Belum ada data skor.</td></tr>';
+                return;
+            }
+            scores.slice(0, 10).forEach((score, index) => {
+                const time = formatTime(score.waktu_bermain);
+                tbody.innerHTML += `
+                    <tr class="${index < 3 ? 'bg-yellow-50 font-bold' : ''} hover:bg-gray-50">
+                        <td class="py-2 px-2">${index + 1}</td>
+                        <td class="py-2 px-3">${score.nama_pemain}</td>
+                        <td class="py-2 px-3 text-blue-600">${score.skor_total}</td>
+                        <td class="py-2 px-3">${time}</td>
+                        <td class="py-2 px-2 text-green-600">${score.pasangan_benar}</td>
+                    </tr>`;
+            });
+        };
+
+        window.checkAdminPassword = () => {
+            const input = document.getElementById('admin-password-input').value;
+            if (input === "sambadsal") {
+                document.getElementById('admin-password-gate').classList.add('hidden');
+                document.getElementById('admin-content').classList.remove('hidden');
+                if(typeof lucide !== 'undefined') lucide.createIcons();
+            } else {
+                document.getElementById('password-feedback').classList.remove('hidden');
+            }
+        };
+
+        window.confirmResetDatabase = () => {
+            const btn = document.querySelector('#admin-content button.bg-red-600');
+            const originalText = btn.textContent;
+            btn.textContent = "Yakin Hapus Semua?";
+            btn.onclick = window.resetDatabase;
+            setTimeout(() => {
+                if(btn.textContent === "Yakin Hapus Semua?") {
+                    btn.textContent = originalText;
+                    btn.onclick = window.confirmResetDatabase;
+                }
+            }, 4000);
+        };
+
+        window.exportScoresToCSV = async () => {
+            const data = await window.fetchAllScores();
+            if (data.length === 0) { alert("Tidak ada data."); return; }
+            const headers = ["Nama", "Skor", "Benar", "Salah", "Waktu(dtk)", "Tanggal", "UID"];
+            const rows = data.map(r => [
+                `"${r.nama_pemain}"`, r.skor_total, r.pasangan_benar, r.percobaan_salah, r.waktu_bermain, 
+                `"${new Date(r.tanggal_main).toLocaleString()}"`, r.userId
+            ].join(';'));
+            const blob = new Blob([[headers.join(';'), ...rows].join('\n')], {type: 'text/csv'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `skor_sinonim_${Date.now()}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        };
+
+        function setupGame() {
+            let words = [];
+            SYNONYM_PAIRS.forEach(p => {
+                words.push({ id: p.id, text: p.word });
+                words.push({ id: p.id, text: p.synonym });
+            });
+            shuffle(words);
+            cards = words;
+            hasFlippedCard = false; lockBoard = false; firstCard = null; secondCard = null;
+            matchesFound = 0; mismatchCount = 0; seconds = 0;
+            clearInterval(timerInterval);
+
+            const grid = document.getElementById('game-grid');
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${Math.sqrt(cards.length)}, minmax(0, 1fr))`;
+
+            cards.forEach((d, i) => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.dataset.id = d.id;
+                el.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-face card-back text-2xl"><i data-lucide="gem"></i></div>
+                        <div class="card-face card-front text-lg font-bold">${d.text}</div>
+                    </div>`;
+                el.addEventListener('click', flipCard);
+                grid.appendChild(el);
+            });
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+            document.getElementById('correct-count').textContent = '0';
+            document.getElementById('mismatch-count').textContent = '0';
+            document.getElementById('game-timer').textContent = '00:00';
+        }
+
+        window.startGame = () => {
+            playerName = document.getElementById('player-name-input').value.trim();
+            if (playerName.length < 2) { alert("Nama minimal 2 huruf."); return; }
+            document.getElementById('current-player-name').textContent = playerName;
+            setupGame();
+            showScreen('game-screen');
+            timerInterval = setInterval(() => {
+                seconds++;
+                document.getElementById('game-timer').textContent = formatTime(seconds);
+            }, 1000);
+        };
+
+        function flipCard() {
+            if (lockBoard || this === firstCard) return;
+            this.classList.add('is-flipped');
+            if (!hasFlippedCard) { hasFlippedCard = true; firstCard = this; return; }
+            secondCard = this;
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            if (firstCard.dataset.id === secondCard.dataset.id) disableCards();
+            else unflipCards();
+        }
+
+        function disableCards() {
+            matchesFound++;
+            document.getElementById('correct-count').textContent = matchesFound;
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+            firstCard.classList.add('matched');
+            secondCard.classList.add('matched');
+            resetBoard();
+            if (matchesFound === SYNONYM_PAIRS.length) gameOver();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            mismatchCount++;
+            document.getElementById('mismatch-count').textContent = mismatchCount;
+            setTimeout(() => {
+                firstCard.classList.remove('is-flipped');
+                secondCard.classList.remove('is-flipped');
+                resetBoard();
+            }, 1500);
+        }
+
+        function resetBoard() {
+            [hasFlippedCard, lockBoard] = [false, false];
+            [firstCard, secondCard] = [null, null];
+        }
+
+        function gameOver() {
+            clearInterval(timerInterval);
+            const score = Math.max(0, (matchesFound * 100) - (mismatchCount * 10) - Math.floor(seconds/2));
+            window.saveScore({
+                nama_pemain: playerName,
+                tanggal_main: new Date().toISOString(),
+                waktu_bermain: seconds,
+                pasangan_benar: matchesFound,
+                percobaan_salah: mismatchCount,
+                skor_total: score
+            });
+            document.getElementById('result-name').textContent = playerName;
+            document.getElementById('result-time').textContent = formatTime(seconds);
+            document.getElementById('result-correct').textContent = matchesFound;
+            document.getElementById('result-mismatch').textContent = mismatchCount;
+            document.getElementById('result-score').textContent = score;
+            showScreen('result-screen');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => showScreen('home-screen'));
     </script>
 </body>
 </html>
